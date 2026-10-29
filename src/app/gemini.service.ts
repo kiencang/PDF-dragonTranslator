@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { PromptService } from './prompt.service';
 
 export interface TranslationResult {
   text: string;
@@ -7,8 +8,6 @@ export interface TranslationResult {
 
 interface ServerGenerateResponse {
   text?: string;
-  candidates?: { finishReason?: string }[];
-  usageMetadata?: any;
   error?: { message?: string };
 }
 
@@ -24,9 +23,8 @@ interface InteractionApiResponse {
   providedIn: 'root'
 })
 export class GeminiService {
+  private promptService = inject(PromptService);
   private readonly MODEL_NAME_ARGON = 'gemini-4-argon';
-  private readonly MODEL_NAME_FLASH = 'gemini-flash-latest';
-  private readonly MODEL_NAME_FLASH_LITE = 'gemini-flash-lite-latest';
   private readonly MAX_OUTPUT_TOKENS = 256000;
 
   private getUserApiKey(): string {
@@ -316,9 +314,6 @@ export class GeminiService {
     model: string;
     parts: any[];
     systemInstruction?: string;
-    useGoogleSearch?: boolean;
-    thinkingLevel?: string;
-    maxOutputTokens?: number;
     userApiKey: string;
   }): Promise<ServerGenerateResponse> {
     const cleanModel = payload.model.replace(/^models\//, '');
@@ -342,23 +337,6 @@ export class GeminiService {
       body['systemInstruction'] = {
         parts: [{ text: payload.systemInstruction }]
       };
-    }
-
-    const generationConfig: Record<string, any> = {};
-    if (payload.thinkingLevel) {
-      generationConfig['thinkingConfig'] = {
-        thinkingLevel: payload.thinkingLevel
-      };
-    }
-    if (payload.maxOutputTokens) {
-      generationConfig['maxOutputTokens'] = payload.maxOutputTokens;
-    }
-    if (Object.keys(generationConfig).length > 0) {
-      body['generationConfig'] = generationConfig;
-    }
-
-    if (payload.useGoogleSearch) {
-      body['tools'] = [{ googleSearch: {} }];
     }
 
     const response = await fetch(url, {
@@ -392,26 +370,21 @@ export class GeminiService {
     }
 
     return {
-      text: extractedText,
-      candidates: data.candidates?.map((c: any) => ({ finishReason: c.finishReason })),
-      usageMetadata: data.usageMetadata
+      text: extractedText
     };
   }
 
   private async directCountTokens(fileData: string, mimeType: string, userApiKey: string): Promise<number> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:countTokens?key=${userApiKey}`;
     const cleanFileData = fileData.includes(',') ? fileData.split(',')[1] : fileData;
-    const contentParts =
-      mimeType === 'text/html'
-        ? [{ text: fileData }]
-        : [
-            {
-              inlineData: {
-                data: cleanFileData,
-                mimeType: mimeType
-              }
-            }
-          ];
+    const contentParts = [
+      {
+        inlineData: {
+          data: cleanFileData,
+          mimeType: mimeType
+        }
+      }
+    ];
 
     const response = await fetch(url, {
       method: 'POST',
@@ -448,9 +421,6 @@ export class GeminiService {
     model: string;
     parts: any[];
     systemInstruction?: string;
-    useGoogleSearch?: boolean;
-    thinkingLevel?: string;
-    maxOutputTokens?: number;
     userApiKey: string;
   }): Promise<ServerGenerateResponse> {
     if (this.serverProxyAvailable !== false) {
@@ -549,16 +519,10 @@ export class GeminiService {
     thinkingLevel: 'medium' | 'high' = 'medium'
   ): Promise<string> {
     const userApiKey = this.getUserApiKey();
-    const systemInstruction = `Bạn là một chuyên gia thiết kế web, UI/UX và phiên dịch.
-Người dùng gửi cho bạn một hình ảnh.
-Nhiệm vụ 1: Đánh giá xem hình ảnh này có phải là sơ đồ, biểu đồ, hình vẽ kỹ thuật, hay bất kỳ hình thức nào chứa văn bản cần dịch không. Nếu đây là ảnh chụp thông thường (chân dung, phong cảnh, động vật, nhà cửa, v.v.) không chứa nội dung cần dịch, hãy trả về CHÍNH XÁC chuỗi: [REJECT].
-Nhiệm vụ 2: Nếu hình ảnh hợp lệ, hãy tái tạo lại hình ảnh đó bằng HTML và CSS một cách chính xác và thẩm mỹ nhất. Dịch tất cả văn bản trong hình sang Tiếng Việt.
-YÊU CẦU KỸ THUẬT QUAN TRỌNG:
-1. Tính tương thích (Responsive): Cấu trúc tạo ra phải co giãn tốt. TUYỆT ĐỐI KHÔNG thiết lập chiều rộng cố định (như width: 800px) gây tràn khung. Dùng \`max-width: 100%\`, \`width: 100%\`, \`box-sizing: border-box\`, và các đơn vị tương đối (%, rem, em). Đảm bảo tuyệt đối KHÔNG xuất hiện thanh cuộn ngang.
-2. Bố cục thông minh: Ưu tiên sử dụng Flexbox hoặc CSS Grid để xây dựng bố cục sơ đồ, biểu đồ mạch lạc. Tránh lạm dụng \`position: absolute\` trừ khi thực sự cần thiết (như chú thích điểm ảnh), giúp cấu trúc linh hoạt trên mọi kích thước màn hình.
-3. Typography & UI: Sử dụng \`font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;\` để văn bản hiển thị hiện đại, chuyên nghiệp. Điều chỉnh \`font-size\`, \`line-height\` và \`padding\` linh hoạt sao cho nội dung tiếng Việt dễ đọc, không bị che khuất hoặc tràn khỏi container.
-4. Màu sắc & Hình khối: Cố gắng mô phỏng trung thực (hoặc cải thiện để đẹp mắt hơn) màu sắc nền, độ tương phản chữ, border-radius, border, và shadow từ ảnh gốc để kết quả trông sắc nét và chuyên nghiệp.
-Chỉ trả về mã HTML (được phép bao gồm thẻ <style> bên trong, không chứa markdown như \`\`\`html), không giải thích gì thêm.`;
+    const [systemInstruction, promptText] = await Promise.all([
+      this.promptService.loadPrompt('image_translation_system_instructions.md'),
+      this.promptService.loadPrompt('image_translation_prompt.md')
+    ]);
 
     const mime = dataUrl.split(';')[0].split(':')[1];
     const data = dataUrl.split(',')[1];
@@ -571,7 +535,7 @@ Chỉ trả về mã HTML (được phép bao gồm thẻ <style> bên trong, kh
       },
       {
         type: 'text',
-        text: 'Hãy tái tạo và dịch hình ảnh này sang HTML/CSS. Nếu không phải hình cần dịch, trả về [REJECT].'
+        text: promptText.trim()
       }
     ];
 

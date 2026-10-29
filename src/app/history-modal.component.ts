@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, X, FileText, Trash2, Eye, Clock, Download, Coins } from 'lucide-angular';
+import { LucideAngularModule, X, FileText, Trash2, Clock, Download, Coins } from 'lucide-angular';
 import { TranslatedDoc } from './storage.service';
 
 @Component({
@@ -95,11 +95,7 @@ import { TranslatedDoc } from './storage.service';
                             {{ getModeLabel(item.mode) }}
                           </span>
                           @if (item.model) {
-                            <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full"
-                                  [ngClass]="{
-                                    'bg-purple-50 text-purple-700 border border-purple-200/50': item.model.includes('pro') || item.model.includes('argon'),
-                                    'bg-amber-50 text-amber-700 border border-amber-200/50': item.model.includes('flash')
-                                  }">
+                            <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/50">
                               {{ getModelLabel(item.model) }}
                             </span>
                           }
@@ -174,7 +170,6 @@ export class HistoryModalComponent {
   readonly X = X;
   readonly FileText = FileText;
   readonly Trash2 = Trash2;
-  readonly Eye = Eye;
   readonly Clock = Clock;
   readonly Download = Download;
   readonly Coins = Coins;
@@ -240,8 +235,6 @@ export class HistoryModalComponent {
   getModelLabel(model?: string): string {
     if (!model) return '';
     if (model.includes('argon')) return 'Gemini Argon';
-    if (model.includes('pro')) return 'Model Pro';
-    if (model.includes('flash')) return 'Model Flash';
     return model;
   }
 

@@ -9,21 +9,6 @@ export interface ExtractedImage {
   providedIn: 'root'
 })
 export class ImageProcessorService {
-  extractImagesFromHtml(html: string): { cleanHtml: string; extractedImages: ExtractedImage[] } {
-    const extractedImages: ExtractedImage[] = [];
-    
-    const regex = /(?:src|href|data)=(['"])(data:image\/.*?)\1|url\((['"]?)(data:image\/.*?)\3\)/gi;
-    
-    const cleanHtml = html.replace(regex, (match, q1, g1, q2, g2) => {
-      const dataUrl = g1 || g2;
-      const id = `img_placeholder_${crypto.randomUUID()}`;
-      extractedImages.push({ id, dataUrl });
-      return match.replace(dataUrl, id);
-    });
-
-    return { cleanHtml, extractedImages };
-  }
-
   extractHtml(text: string): string {
     const match = text.match(/```[a-zA-Z]*\s*([\s\S]*?)\s*```/);
     return match ? match[1] : text;
@@ -52,6 +37,7 @@ export class ImageProcessorService {
     const interactiveScript = `
 <style>
   .interactive-img-wrapper { position: relative; display: inline-block; max-width: 100%; }
+  .interactive-img-wrapper.show-reconstructed { display: block; width: 100%; }
   .interactive-img-wrapper img.original-img { display: block; max-width: 100%; height: auto; }
   .translate-btn {
     position: absolute; top: 8px; right: 8px;
@@ -61,8 +47,8 @@ export class ImageProcessorService {
   }
   .interactive-img-wrapper:hover .translate-btn { opacity: 1; }
   .translate-btn:hover { background: rgba(17, 24, 39, 1); }
-  .reconstructed-wrapper { display: none; width: 100%; overflow: auto; }
-  .show-reconstructed .reconstructed-wrapper { display: block; }
+  .reconstructed-wrapper { display: none; width: 100%; overflow-x: auto; }
+  .show-reconstructed .reconstructed-wrapper { display: block; width: 100%; }
   .show-reconstructed img.original-img { display: none; }
 
   #img-trans-toast-container {

@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, signal, inject, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
-import { LucideAngularModule, UploadCloud, FileText, Settings, Play, Download, CheckCircle2, AlertCircle, Loader2, ArrowDown, RefreshCw, Maximize, Minimize, Clock, Info, X, Search, ExternalLink, Scissors, FileEdit, User, Copy, Key, Eye, EyeOff, Trash2, LayoutGrid } from 'lucide-angular';
+import { LucideAngularModule, Clock, LayoutGrid } from 'lucide-angular';
 import { SettingsModalComponent } from './settings-modal.component';
 import { ApiKeyModalComponent } from './api-key-modal.component';
 import { ToastsComponent } from './toasts.component';
@@ -31,31 +31,7 @@ export class App {
   private translationState = inject(TranslationState);
 
   // Icons
-  readonly UploadCloud = UploadCloud;
-  readonly FileText = FileText;
-  readonly Settings = Settings;
-  readonly Play = Play;
-  readonly Download = Download;
-  readonly CheckCircle2 = CheckCircle2;
-  readonly AlertCircle = AlertCircle;
-  readonly Loader2 = Loader2;
-  readonly ArrowDown = ArrowDown;
-  readonly RefreshCw = RefreshCw;
-  readonly Maximize = Maximize;
-  readonly Minimize = Minimize;
   readonly Clock = Clock;
-  readonly Info = Info;
-  readonly X = X;
-  readonly Search = Search;
-  readonly ExternalLink = ExternalLink;
-  readonly Scissors = Scissors;
-  readonly FileEdit = FileEdit;
-  readonly User = User;
-  readonly Copy = Copy;
-  readonly Key = Key;
-  readonly Eye = Eye;
-  readonly EyeOff = EyeOff;
-  readonly Trash2 = Trash2;
   readonly LayoutGrid = LayoutGrid;
 
   // Form Controls
@@ -69,7 +45,6 @@ export class App {
   showApiKeyModal = signal<boolean>(false);
   tempApiKey = signal<string>('');
   tempThinkingLevel = signal<ThinkingLevelOption>('medium');
-  showKeyPlain = signal<boolean>(false);
   showHistoryModal = signal<boolean>(false);
   showAppsModal = signal<boolean>(false);
   isFullscreen = signal<boolean>(false);
@@ -96,8 +71,6 @@ export class App {
   userApiKey = this.translationState.userApiKey;
   historyItems = this.translationState.historyItems;
   activeHistoryItemId = this.translationState.activeHistoryItemId;
-  mode = this.translationState.mode;
-  useGoogleSearch = this.translationState.useGoogleSearch;
   canProcess = this.translationState.canProcess;
 
   private cropTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -192,7 +165,6 @@ export class App {
       this.tempApiKey.set('');
       this.tempThinkingLevel.set(this.translationState.thinkingLevel());
     }
-    this.showKeyPlain.set(false);
     this.showApiKeyModal.set(true);
   }
 
@@ -229,10 +201,6 @@ export class App {
     this.tempApiKey.set('');
     this.showApiKeyModal.set(false);
     this.showToast('info', 'Đã xóa cấu hình API Key. Hãy cấu hình lại để tiếp tục sử dụng.');
-  }
-
-  toggleShowKeyPlain() {
-    this.showKeyPlain.update(v => !v);
   }
 
   onFileSelected(file: File) {

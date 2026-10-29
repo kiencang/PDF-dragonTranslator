@@ -155,19 +155,6 @@ export class TranslationState {
     }
   }
 
-  private readFileAsBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const res = reader.result as string;
-        const base64 = res.includes(',') ? res.split(',')[1] : res;
-        resolve(base64);
-      };
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
-    });
-  }
-
   private resetFileState() {
     this.selectedFile.set(null);
     this.fileBase64.set(null);

@@ -149,20 +149,15 @@ export class ResultSectionComponent {
 
   @Input() isFullscreen = false;
   @Input() isProcessing = false;
-  @Input() resultHtml: string | null = null;
   @Input() progressMessage = '';
   @Input() formattedTime = '';
   @Input() selectedModel = 'gemini-4-argon';
-  @Input() mode = 'normal';
 
   @Output() downloadHtml = new EventEmitter<void>();
   @Output() toggleFullscreen = new EventEmitter<void>();
 
   previewIframe = viewChild<ElementRef<HTMLIFrameElement>>('previewIframe');
 
-  // This helps react to inner changes via hook or effect.
-  // Using an effect in the parent is generally required, but we can do it inside ngOnChanges or effect.
-  // We'll use a signal driven approach
   private htmlSignal = signal<string | null>(null);
   
   private geminiService = inject(GeminiService);
@@ -172,8 +167,11 @@ export class ResultSectionComponent {
   private skipNextIframeReload = false;
 
   @Input({ required: true })
-  set htmlContent(val: string | null) {
+  set resultHtml(val: string | null) {
     this.htmlSignal.set(val);
+  }
+  get resultHtml(): string | null {
+    return this.htmlSignal();
   }
 
   @HostListener('window:message', ['$event'])

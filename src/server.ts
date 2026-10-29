@@ -103,17 +103,14 @@ app.post('/api/gemini/count-tokens', async (req, res) => {
     };
 
     const ai = getAiInstance(userApiKey);
-    const contentParts =
-      mimeType === 'text/html'
-        ? [{ text: fileData }]
-        : [
-            {
-              inlineData: {
-                data: fileData,
-                mimeType: mimeType,
-              },
-            },
-          ];
+    const contentParts = [
+      {
+        inlineData: {
+          data: fileData,
+          mimeType: mimeType,
+        },
+      },
+    ];
 
     const result = await ai.models.countTokens({
       model: 'gemini-flash-lite-latest',
@@ -205,17 +202,11 @@ app.post('/api/gemini/generate', async (req, res) => {
       model,
       parts,
       systemInstruction,
-      useGoogleSearch,
-      thinkingLevel,
-      maxOutputTokens,
       userApiKey,
     } = req.body as {
       model: string;
       parts: Record<string, unknown>[];
       systemInstruction?: string;
-      useGoogleSearch?: boolean;
-      thinkingLevel?: string;
-      maxOutputTokens?: number;
       userApiKey?: string;
     };
 
@@ -246,18 +237,6 @@ app.post('/api/gemini/generate', async (req, res) => {
       config['systemInstruction'] = { parts: [{ text: systemInstruction }] };
     }
 
-    if (thinkingLevel) {
-      config['thinkingConfig'] = { thinkingLevel };
-    }
-
-    if (maxOutputTokens) {
-      config['maxOutputTokens'] = maxOutputTokens;
-    }
-
-    if (useGoogleSearch) {
-      config['tools'] = [{ googleSearch: {} }];
-    }
-
     const response = await ai.models.generateContent({
       model,
       contents: [{ parts }],
@@ -266,8 +245,6 @@ app.post('/api/gemini/generate', async (req, res) => {
 
     res.json({
       text: response.text || '',
-      candidates: response.candidates,
-      usageMetadata: response.usageMetadata,
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Lỗi không xác định khi gọi Gemini API';

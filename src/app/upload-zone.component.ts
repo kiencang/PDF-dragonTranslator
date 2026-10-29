@@ -181,7 +181,6 @@ export class UploadZoneComponent {
   @Input() hasFile = false;
   @Input() isHistoryView = false;
   @Input() hasOriginalFile = false;
-  @Input() hasResult = false;
   @Input() selectedFile: File | null = null;
   @Input() pdfTotalPages = 0;
   @Input() pdfStartPage = 0;
