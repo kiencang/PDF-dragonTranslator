@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
-import { LucideAngularModule, X, Zap, Brain } from 'lucide-angular';
+import { LucideAngularModule, X, Zap, Brain } from './lucide-icons';
 import { TranslationMode, SearchModel } from './translation.state';
 
 @Component({
@@ -15,7 +15,7 @@ import { TranslationMode, SearchModel } from './translation.state';
         <!-- Header (Sticky / Fixed) -->
         <div class="p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <h3 id="settings-title" class="text-lg font-semibold text-slate-900">Thay đổi phong cách mặc định</h3>
-          <button (click)="closeModal.emit()" class="text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none rounded-full p-2 cursor-pointer" aria-label="Đóng cài đặt">
+          <button (click)="closeModal.emit()" class="text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none rounded-full p-2 cursor-pointer flex items-center justify-center" aria-label="Đóng cài đặt">
             <lucide-icon [img]="X" class="w-5 h-5" aria-hidden="true"></lucide-icon>
           </button>
         </div>

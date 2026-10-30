@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, signal, inject, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
-import { LucideAngularModule, Clock, LayoutGrid } from 'lucide-angular';
+import { LucideAngularModule, Clock, LayoutGrid } from './lucide-icons';
 import { SettingsModalComponent } from './settings-modal.component';
 import { ApiKeyModalComponent } from './api-key-modal.component';
 import { ToastsComponent } from './toasts.component';

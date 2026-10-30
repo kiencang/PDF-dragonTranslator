@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, Input, Output, EventEmitter, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, UploadCloud, CheckCircle2, Scissors, Loader2, FileEdit, AlertCircle, Clock, Download } from 'lucide-angular';
+import { LucideAngularModule, UploadCloud, CheckCircle2, Scissors, Loader2, FileEdit, AlertCircle, Clock, Download } from './lucide-icons';
 
 @Component({
   selector: 'app-upload-zone',
@@ -48,7 +48,7 @@ import { LucideAngularModule, UploadCloud, CheckCircle2, Scissors, Loader2, File
           
           @if (!hasFile) {
             <div class="flex flex-col items-center gap-3">
-              <div class="p-3 bg-indigo-50 text-indigo-600 rounded-full">
+              <div class="p-3 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
                 <lucide-icon [img]="UploadCloud" class="w-6 h-6" aria-hidden="true"></lucide-icon>
               </div>
               <div class="text-center">
@@ -65,7 +65,7 @@ import { LucideAngularModule, UploadCloud, CheckCircle2, Scissors, Loader2, File
             </div>
           } @else if (isHistoryView) {
             <div class="flex flex-col items-center gap-3 w-full">
-              <div class="p-3 bg-indigo-50 text-indigo-600 rounded-full">
+              <div class="p-3 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
                 <lucide-icon [img]="Clock" class="w-6 h-6" aria-hidden="true"></lucide-icon>
               </div>
               <div class="text-center w-full px-2">
@@ -92,7 +92,7 @@ import { LucideAngularModule, UploadCloud, CheckCircle2, Scissors, Loader2, File
             </div>
           } @else {
             <div class="flex flex-col items-center gap-3 w-full">
-              <div class="p-3 bg-emerald-50 text-emerald-600 rounded-full">
+              <div class="p-3 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
                 <lucide-icon [img]="CheckCircle2" class="w-6 h-6" aria-hidden="true"></lucide-icon>
               </div>
               <div class="text-center w-full">

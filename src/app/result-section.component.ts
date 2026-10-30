@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, Input, Output, EventEmitter, ElementRef, viewChild, effect, signal, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, Download, Maximize, Minimize, Loader2, Clock, FileText } from 'lucide-angular';
+import { LucideAngularModule, Download, Maximize, Minimize, Loader2, Clock, FileText } from './lucide-icons';
 import { GeminiService } from './gemini.service';
 import { ImageProcessorService } from './image-processor.service';
 import { TranslationState } from './translation.state';
@@ -36,7 +36,7 @@ import { TranslationState } from './translation.state';
             <div class="w-px h-4 bg-slate-200 ml-2.5 mr-1 shrink-0" aria-hidden="true"></div>
 
             <div class="relative group flex items-center">
-              <button (click)="toggleFullscreen.emit()" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer" [attr.aria-label]="isFullscreen ? 'Thu nhỏ.' : 'Đọc toàn màn hình.'">
+              <button (click)="toggleFullscreen.emit()" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer flex items-center justify-center" [attr.aria-label]="isFullscreen ? 'Thu nhỏ.' : 'Đọc toàn màn hình.'">
                 @if (isFullscreen) {
                   <lucide-icon [img]="MinimizeIcon" class="w-4 h-4" aria-hidden="true"></lucide-icon>
                 } @else {

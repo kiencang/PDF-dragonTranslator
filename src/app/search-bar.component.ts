@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, signal, inject, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Search, Loader2, X, ExternalLink } from 'lucide-angular';
+import { LucideAngularModule, Search, Loader2, X, ExternalLink } from './lucide-icons';
 import { GeminiService } from './gemini.service';
 import { ToastService } from './toast.service';
 import { TranslationState } from './translation.state';
@@ -45,7 +45,7 @@ import { TranslationState } from './translation.state';
           <div class="p-4">
             <div class="flex justify-between items-start mb-2">
               <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Từ khóa tiếng Anh:</span>
-              <button (click)="closeSearch()" aria-label="Đóng kết quả tìm kiếm" class="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 rounded-md p-0.5 cursor-pointer">
+              <button (click)="closeSearch()" aria-label="Đóng kết quả tìm kiếm" class="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 rounded-md p-0.5 cursor-pointer flex items-center justify-center">
                 <lucide-icon [img]="XIcon" class="w-4 h-4" aria-hidden="true"></lucide-icon>
               </button>
             </div>

@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-import { PDFDocument } from 'pdf-lib';
 
 export interface PdfCropResult {
   fileBase64: string;
@@ -181,6 +180,7 @@ export class PdfService {
   }
 
   async getPageCount(file: File): Promise<number> {
+    const { PDFDocument } = await import('pdf-lib');
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(arrayBuffer);
     return pdfDoc.getPageCount();
@@ -191,6 +191,7 @@ export class PdfService {
       throw new Error('Trang bắt đầu không được lớn hơn trang kết thúc.');
     }
 
+    const { PDFDocument } = await import('pdf-lib');
     const arrayBuffer = await file.arrayBuffer();
     const originalPdf = await PDFDocument.load(arrayBuffer);
     const newPdf = await PDFDocument.create();

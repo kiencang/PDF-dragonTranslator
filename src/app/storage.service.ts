@@ -15,6 +15,7 @@ export interface TranslatedDoc {
   promptTokens?: number;
   candidatesTokens?: number;
   durationSeconds?: number;
+  thinkingLevel?: 'medium' | 'high';
 }
 
 @Injectable({

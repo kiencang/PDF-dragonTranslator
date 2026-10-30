@@ -322,7 +322,8 @@ export class TranslationState {
         originalFileMimeType: this.mimeType() || undefined,
         promptTokens: this.lastTranslationUsageMetadata?.promptTokenCount,
         candidatesTokens: this.lastTranslationUsageMetadata?.candidatesTokenCount,
-        durationSeconds: this.elapsedTime()
+        durationSeconds: this.elapsedTime(),
+        thinkingLevel: this.thinkingLevel()
       }).catch(err => {
         console.error('Lỗi khi lưu lịch sử:', err);
         return undefined;

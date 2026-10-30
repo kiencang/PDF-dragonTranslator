@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, EventEmitter, Input, Output, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Key, X, ExternalLink, EyeOff, Eye, Trash2, Zap, Brain } from 'lucide-angular';
+import { LucideAngularModule, Key, X, ExternalLink, EyeOff, Eye, Trash2, Zap, Brain } from './lucide-icons';
 import { ThinkingLevelOption } from './translation.state';
 
 @Component({
@@ -25,7 +25,7 @@ import { ThinkingLevelOption } from './translation.state';
             ></lucide-icon>
             <h3 id="api-key-title" class="text-lg font-bold text-slate-900">Cấu hình Gemini API Key</h3>
           </div>
-          <button (click)="closeModal.emit()" class="text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none rounded-full p-2 cursor-pointer" aria-label="Đóng cấu hình">
+          <button (click)="closeModal.emit()" class="text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none rounded-full p-2 cursor-pointer flex items-center justify-center" aria-label="Đóng cấu hình">
             <lucide-icon [img]="XIcon" class="w-5 h-5" aria-hidden="true"></lucide-icon>
           </button>
         </div>

@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, FileText, Key } from 'lucide-angular';
+import { LucideAngularModule, FileText, Key } from './lucide-icons';
 import { SearchBarComponent } from './search-bar.component';
 
 @Component({
@@ -25,7 +25,7 @@ import { SearchBarComponent } from './search-bar.component';
               [attr.tabindex]="!isProcessing ? 0 : -1"
               [attr.aria-disabled]="isProcessing ? 'true' : null"
               [title]="isProcessing ? 'Đang trong tiến trình xử lý, không thể làm mới' : 'Về trang chính / Tải tài liệu mới'"
-              class="bg-indigo-600 text-white p-1.5 rounded-lg shrink-0 shadow-sm transition-all select-none"
+              class="bg-indigo-600 text-white p-1.5 rounded-lg shrink-0 shadow-sm transition-all select-none flex items-center justify-center"
               [class.cursor-pointer]="!isProcessing"
               [class.hover:bg-indigo-700]="!isProcessing"
               [class.hover:scale-105]="!isProcessing"
@@ -68,7 +68,7 @@ import { SearchBarComponent } from './search-bar.component';
               >
                 <lucide-icon 
                   [img]="Key" 
-                  class="w-3 h-3 inline-block shrink-0 transition-transform duration-200 origin-center -translate-y-[1px]"
+                  class="w-3 h-3 shrink-0 transition-transform duration-200 origin-center -translate-y-[1px]"
                   [class.rotate-[15deg]]="hasUserApiKey"
                   [class.rotate-[75deg]]="!hasUserApiKey"
                 ></lucide-icon>

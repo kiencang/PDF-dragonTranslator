@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, X } from 'lucide-angular';
+import { LucideAngularModule, X } from './lucide-icons';
 import { ToastService } from './toast.service';
 
 @Component({
@@ -28,7 +28,7 @@ import { ToastService } from './toast.service';
             {{ toast.message }}
           </p>
           
-          <button (click)="removeToast(toast.id)" class="shrink-0 p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors focus:outline-none cursor-pointer" aria-label="Đóng thông báo">
+          <button (click)="removeToast(toast.id)" class="shrink-0 p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors focus:outline-none cursor-pointer flex items-center justify-center" aria-label="Đóng thông báo">
             <lucide-icon [img]="XIcon" class="w-4 h-4" aria-hidden="true"></lucide-icon>
           </button>
         </div>
