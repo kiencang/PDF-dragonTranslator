@@ -101,7 +101,11 @@ export class SearchBarComponent {
       else if (parsedError.includes('503') || parsedError.toLowerCase().includes('overloaded')) {
         this.toastService.show('error', 'Lỗi: Máy chủ AI hiện đang bận (Overloaded). Vui lòng thử lại sau.');
       }
-      else if (parsedError.toLowerCase().includes('safety') || parsedError.toLowerCase().includes('blocked')) {
+      else if (
+        (parsedError.toLowerCase().includes('safety') || parsedError.toLowerCase().includes('blocked')) &&
+        !parsedError.toLowerCase().includes('safety_settings') &&
+        !parsedError.toLowerCase().includes('not supported')
+      ) {
         this.toastService.show('error', 'Lỗi: Yêu cầu dịch từ khóa bị từ chối do vi phạm chính sách an toàn của Google.');
       }
       else if (parsedError.includes('JSON.parse: unexpected character')) {

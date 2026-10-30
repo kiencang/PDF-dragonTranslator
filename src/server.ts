@@ -23,7 +23,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder =
@@ -77,20 +77,72 @@ function formatInteractionResult(interaction: Record<string, any>) {
   }
 
   const usage = interaction['usage'];
-  const usageMetadata = usage
-    ? {
-        promptTokenCount: usage.input_tokens ?? usage.promptTokenCount,
-        candidatesTokenCount: usage.output_tokens ?? usage.candidatesTokenCount,
-        totalTokenCount: usage.total_tokens ?? usage.totalTokenCount,
+  let usageMetadata:
+    | {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
       }
-    : undefined;
+    | undefined;
+
+  if (usage) {
+    const promptTokenCount =
+      usage.total_input_tokens ??
+      usage.initial_input_tokens ??
+      usage.input_tokens ??
+      usage.promptTokenCount;
+
+    const totalTokenCount = usage.total_tokens ?? usage.totalTokenCount;
+
+    const hasOutputBreakdown =
+      usage.total_output_tokens !== undefined ||
+      usage.total_thought_tokens !== undefined ||
+      usage.total_tool_use_tokens !== undefined ||
+      usage.output_tokens !== undefined ||
+      usage.candidatesTokenCount !== undefined;
+
+    let candidatesTokenCount: number | undefined;
+    if (hasOutputBreakdown) {
+      const sumBreakdown =
+        (usage.total_output_tokens ?? usage.output_tokens ?? usage.candidatesTokenCount ?? 0) +
+        (usage.total_thought_tokens ?? usage.thought_tokens ?? usage.thoughtsTokenCount ?? 0) +
+        (usage.total_tool_use_tokens ?? usage.tool_use_tokens ?? usage.toolUsePromptTokenCount ?? 0);
+
+      if (totalTokenCount !== undefined && promptTokenCount !== undefined && totalTokenCount >= promptTokenCount) {
+        candidatesTokenCount = Math.max(sumBreakdown, totalTokenCount - promptTokenCount);
+      } else {
+        candidatesTokenCount = sumBreakdown;
+      }
+    } else if (totalTokenCount !== undefined && promptTokenCount !== undefined && totalTokenCount >= promptTokenCount) {
+      candidatesTokenCount = totalTokenCount - promptTokenCount;
+    }
+
+    if (promptTokenCount !== undefined || candidatesTokenCount !== undefined || totalTokenCount !== undefined) {
+      usageMetadata = {
+        promptTokenCount,
+        candidatesTokenCount,
+        totalTokenCount,
+      };
+    }
+  }
+
+  let extractedError = interaction['error'];
+  if (!extractedError && Array.isArray(interaction['errors']) && interaction['errors'].length > 0) {
+    const messages = interaction['errors']
+      .map((err: any) => (typeof err === 'string' ? err : err?.message || err?.code))
+      .filter(Boolean);
+    if (messages.length > 0) {
+      extractedError = { message: messages.join('; ') };
+    }
+  }
 
   return {
     id: interaction['id'],
     status: interaction['status'],
     output_text: fullOutput,
     usageMetadata,
-    error: interaction['error'],
+    error: extractedError,
+    errors: interaction['errors'],
   };
 }
 
@@ -150,14 +202,26 @@ app.post('/api/gemini/interactions/create', async (req, res) => {
 
     const generationConfig: Record<string, unknown> = {
       max_output_tokens: maxOutputTokens ?? 256000,
-      thinking_level: (thinkingLevel || 'medium').toLowerCase(),
     };
 
+    if (thinkingLevel) {
+      generationConfig['thinking_level'] = thinkingLevel.toLowerCase();
+    }
+
+    const cleanModel = (model || 'gemini-4-argon').replace(/^models\//, '');
+
     const createParams: Record<string, unknown> = {
-      model: model || 'gemini-4-argon',
+      model: cleanModel,
       input,
       background: background ?? true,
       generation_config: generationConfig,
+      safety_settings: [
+        { type: 'harassment', threshold: 'off' },
+        { type: 'hate_speech', threshold: 'off' },
+        { type: 'sexually_explicit', threshold: 'off' },
+        { type: 'dangerous_content', threshold: 'off' },
+        { type: 'jailbreak', threshold: 'off' },
+      ],
     };
 
     if (systemInstruction) {
@@ -192,62 +256,6 @@ app.post('/api/gemini/interactions/get', async (req, res) => {
     res.json(formatInteractionResult(result as unknown as Record<string, any>));
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Lỗi khi kiểm tra trạng thái tiến trình dịch (Interactions API)';
-    res.status(500).json({ error: { message } });
-  }
-});
-
-app.post('/api/gemini/generate', async (req, res) => {
-  try {
-    const {
-      model,
-      parts,
-      systemInstruction,
-      userApiKey,
-    } = req.body as {
-      model: string;
-      parts: Record<string, unknown>[];
-      systemInstruction?: string;
-      userApiKey?: string;
-    };
-
-    const ai = getAiInstance(userApiKey);
-
-    const config: Record<string, unknown> = {
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-      ],
-    };
-
-    if (systemInstruction) {
-      config['systemInstruction'] = { parts: [{ text: systemInstruction }] };
-    }
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ parts }],
-      config,
-    });
-
-    res.json({
-      text: response.text || '',
-    });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'Lỗi không xác định khi gọi Gemini API';
     res.status(500).json({ error: { message } });
   }
 });

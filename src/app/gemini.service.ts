@@ -6,11 +6,6 @@ export interface TranslationResult {
   usageMetadata?: any;
 }
 
-interface ServerGenerateResponse {
-  text?: string;
-  error?: { message?: string };
-}
-
 interface InteractionApiResponse {
   id: string;
   status: string;
@@ -138,21 +133,85 @@ export class GeminiService {
       fullOutput = raw.output_text;
     }
 
-    const usage = raw?.usage || raw?.usageMetadata;
-    const usageMetadata = usage
-      ? {
-          promptTokenCount: usage.input_tokens ?? usage.promptTokenCount,
-          candidatesTokenCount: usage.output_tokens ?? usage.candidatesTokenCount,
-          totalTokenCount: usage.total_tokens ?? usage.totalTokenCount,
+    let usageMetadata:
+      | {
+          promptTokenCount?: number;
+          candidatesTokenCount?: number;
+          totalTokenCount?: number;
         }
-      : undefined;
+      | undefined;
+
+    if (raw?.usage) {
+      const usage = raw.usage;
+      const promptTokenCount =
+        usage.total_input_tokens ??
+        usage.initial_input_tokens ??
+        usage.input_tokens ??
+        usage.promptTokenCount;
+
+      const totalTokenCount = usage.total_tokens ?? usage.totalTokenCount;
+
+      const hasOutputBreakdown =
+        usage.total_output_tokens !== undefined ||
+        usage.total_thought_tokens !== undefined ||
+        usage.total_tool_use_tokens !== undefined ||
+        usage.output_tokens !== undefined ||
+        usage.candidatesTokenCount !== undefined;
+
+      let candidatesTokenCount: number | undefined;
+      if (hasOutputBreakdown) {
+        const sumBreakdown =
+          (usage.total_output_tokens ?? usage.output_tokens ?? usage.candidatesTokenCount ?? 0) +
+          (usage.total_thought_tokens ?? usage.thought_tokens ?? usage.thoughtsTokenCount ?? 0) +
+          (usage.total_tool_use_tokens ?? usage.tool_use_tokens ?? usage.toolUsePromptTokenCount ?? 0);
+
+        if (totalTokenCount !== undefined && promptTokenCount !== undefined && totalTokenCount >= promptTokenCount) {
+          candidatesTokenCount = Math.max(sumBreakdown, totalTokenCount - promptTokenCount);
+        } else {
+          candidatesTokenCount = sumBreakdown;
+        }
+      } else if (totalTokenCount !== undefined && promptTokenCount !== undefined && totalTokenCount >= promptTokenCount) {
+        candidatesTokenCount = totalTokenCount - promptTokenCount;
+      }
+
+      if (promptTokenCount !== undefined || candidatesTokenCount !== undefined || totalTokenCount !== undefined) {
+        usageMetadata = {
+          promptTokenCount,
+          candidatesTokenCount,
+          totalTokenCount,
+        };
+      }
+    } else if (raw?.usageMetadata) {
+      const meta = raw.usageMetadata;
+      if (
+        meta.promptTokenCount !== undefined ||
+        meta.candidatesTokenCount !== undefined ||
+        meta.totalTokenCount !== undefined
+      ) {
+        usageMetadata = {
+          promptTokenCount: meta.promptTokenCount,
+          candidatesTokenCount: meta.candidatesTokenCount,
+          totalTokenCount: meta.totalTokenCount,
+        };
+      }
+    }
+
+    let extractedError = raw?.error;
+    if (!extractedError && Array.isArray(raw?.errors) && raw.errors.length > 0) {
+      const messages = raw.errors
+        .map((err: any) => (typeof err === 'string' ? err : err?.message || err?.code))
+        .filter(Boolean);
+      if (messages.length > 0) {
+        extractedError = { message: messages.join('; ') };
+      }
+    }
 
     return {
       id: raw?.id || '',
       status: raw?.status || '',
       output_text: fullOutput,
       usageMetadata,
-      error: raw?.error,
+      error: extractedError,
     };
   }
 
@@ -167,14 +226,26 @@ export class GeminiService {
     userApiKey: string;
   }): Promise<InteractionApiResponse> {
     const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${payload.userApiKey}`;
+    const generationConfig: Record<string, any> = {
+      max_output_tokens: payload.maxOutputTokens ?? this.MAX_OUTPUT_TOKENS,
+    };
+
+    if (payload.thinkingLevel) {
+      generationConfig['thinking_level'] = payload.thinkingLevel.toLowerCase();
+    }
+
     const body: Record<string, any> = {
-      model: payload.model.startsWith('models/') ? payload.model : `models/${payload.model}`,
+      model: payload.model.replace(/^models\//, ''),
       input: payload.input,
       background: payload.background ?? true,
-      generation_config: {
-        max_output_tokens: payload.maxOutputTokens ?? this.MAX_OUTPUT_TOKENS,
-        thinking_level: (payload.thinkingLevel || 'medium').toLowerCase(),
-      },
+      generation_config: generationConfig,
+      safety_settings: [
+        { type: 'harassment', threshold: 'off' },
+        { type: 'hate_speech', threshold: 'off' },
+        { type: 'sexually_explicit', threshold: 'off' },
+        { type: 'dangerous_content', threshold: 'off' },
+        { type: 'jailbreak', threshold: 'off' },
+      ],
     };
 
     if (payload.systemInstruction) {
@@ -234,6 +305,40 @@ export class GeminiService {
     return this.parseInteractionRawResult(data);
   }
 
+  private resolveTerminalInteraction(result: InteractionApiResponse): TranslationResult | null {
+    const status = result.status;
+
+    if (status === 'in_progress' || status === 'queued' || !status) {
+      return null;
+    }
+
+    if (status === 'completed') {
+      if (!result.output_text) {
+        throw new Error('Gemini hoàn tất nhưng không trả về văn bản kết quả (có thể do lỗi hệ thống hoặc bộ lọc). Vui lòng thử lại.');
+      }
+      return {
+        text: result.output_text,
+        usageMetadata: result.usageMetadata,
+      };
+    }
+
+    if (status === 'incomplete' || status === 'budget_exceeded' || status === 'requires_continuation') {
+      if (result.output_text && result.output_text.trim() !== '') {
+        return {
+          text: result.output_text,
+          usageMetadata: result.usageMetadata,
+        };
+      }
+      const errMsg = typeof result.error === 'string' ? result.error : result.error?.message;
+      throw new Error(
+        errMsg || `Tiến trình dịch dừng sớm do vượt giới hạn tài nguyên/token (${status}) và chưa có kết quả đầu ra.`
+      );
+    }
+
+    const errMsg = typeof result.error === 'string' ? result.error : result.error?.message;
+    throw new Error(errMsg || `Tiến trình dịch trên máy chủ AI đã kết thúc với trạng thái: ${status}.`);
+  }
+
   private async runInteractionWithPolling(payload: {
     model: string;
     input: any;
@@ -257,19 +362,9 @@ export class GeminiService {
       initial = await this.directCreateInteraction(payload);
     }
 
-    if (initial.status === 'completed') {
-      if (!initial.output_text) {
-        throw new Error('Gemini không trả về kết quả (có thể do lỗi hệ thống hoặc bộ lọc). Vui lòng thử lại.');
-      }
-      return {
-        text: initial.output_text,
-        usageMetadata: initial.usageMetadata,
-      };
-    }
-
-    if (initial.status === 'failed' || initial.status === 'cancelled') {
-      const errMsg = typeof initial.error === 'string' ? initial.error : initial.error?.message;
-      throw new Error(errMsg || `Tiến trình dịch thất bại (${initial.status}).`);
+    const immediateResolution = this.resolveTerminalInteraction(initial);
+    if (immediateResolution) {
+      return immediateResolution;
     }
 
     const interactionId = initial.id;
@@ -295,83 +390,11 @@ export class GeminiService {
         pollResult = await this.directGetInteraction(interactionId, payload.userApiKey);
       }
 
-      if (pollResult.status === 'completed') {
-        if (!pollResult.output_text) {
-          throw new Error('Gemini hoàn tất nhưng không trả về văn bản kết quả. Vui lòng thử lại.');
-        }
-        return {
-          text: pollResult.output_text,
-          usageMetadata: pollResult.usageMetadata,
-        };
-      } else if (pollResult.status === 'failed' || pollResult.status === 'cancelled') {
-        const errMsg = typeof pollResult.error === 'string' ? pollResult.error : pollResult.error?.message;
-        throw new Error(errMsg || 'Tiến trình dịch trên máy chủ AI đã thất bại.');
+      const terminalResolution = this.resolveTerminalInteraction(pollResult);
+      if (terminalResolution) {
+        return terminalResolution;
       }
     }
-  }
-
-  private async directGenerate(payload: {
-    model: string;
-    parts: any[];
-    systemInstruction?: string;
-    userApiKey: string;
-  }): Promise<ServerGenerateResponse> {
-    const cleanModel = payload.model.replace(/^models\//, '');
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${payload.userApiKey}`;
-
-    const body: Record<string, any> = {
-      contents: [
-        {
-          parts: payload.parts
-        }
-      ],
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
-      ]
-    };
-
-    if (payload.systemInstruction) {
-      body['systemInstruction'] = {
-        parts: [{ text: payload.systemInstruction }]
-      };
-    }
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-
-    const rawText = await response.text();
-    let data: any = {};
-    try {
-      if (rawText && rawText.trim() !== '') {
-        data = JSON.parse(rawText);
-      }
-    } catch {
-      throw new Error(`Phản hồi không hợp lệ từ Google Gemini API (HTTP ${response.status})`);
-    }
-
-    if (!response.ok) {
-      throw new Error(data?.error?.message || `Lỗi từ Google Gemini API (HTTP ${response.status})`);
-    }
-
-    const candidate = data.candidates?.[0];
-    let extractedText = '';
-    if (candidate?.content?.parts) {
-      extractedText = candidate.content.parts
-        .map((p: any) => p.text || '')
-        .join('');
-    }
-
-    return {
-      text: extractedText
-    };
   }
 
   private async directCountTokens(fileData: string, mimeType: string, userApiKey: string): Promise<number> {
@@ -415,22 +438,6 @@ export class GeminiService {
     }
 
     return data.totalTokens || 0;
-  }
-
-  private async callGenerateEndpoint(payload: {
-    model: string;
-    parts: any[];
-    systemInstruction?: string;
-    userApiKey: string;
-  }): Promise<ServerGenerateResponse> {
-    if (this.serverProxyAvailable !== false) {
-      const serverResult = await this.safeFetchServer('/api/gemini/generate', payload);
-      if (serverResult !== null) {
-        return serverResult;
-      }
-    }
-
-    return await this.directGenerate(payload);
   }
 
   async countTokens(fileData: string, mimeType: string): Promise<number> {
@@ -572,14 +579,16 @@ QUY TẮC BẮT BUỘC TUÂN THỦ:
     const prompt = `Provide the single best English search query translation for the following Vietnamese query. Output ONLY the raw English text, nothing else: ${query}`;
 
     try {
-      const response = await this.callGenerateEndpoint({
+      const result = await this.runInteractionWithPolling({
         model: searchModel,
-        parts: [{ text: prompt }],
+        input: [{ type: 'text', text: prompt }],
         systemInstruction,
+        maxOutputTokens: 1024,
+        background: false,
         userApiKey
       });
 
-      return (response.text || '').trim();
+      return (result.text || '').trim();
     } catch (e: unknown) {
       if (e instanceof Error) {
         throw new Error(e.message);
