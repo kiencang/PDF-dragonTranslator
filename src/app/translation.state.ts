@@ -335,11 +335,12 @@ export class TranslationState {
     }
   }
 
-  async updateImageTranslationInContent(imageSrc: string, translatedHtml: string) {
+  async syncImageTranslations(
+    updates: Array<{ imgId?: string | null; imgIndex?: number; src?: string | null; translatedHtml: string }>
+  ): Promise<boolean> {
     const currentHtml = this.resultHtml();
-    if (!currentHtml || !imageSrc) return;
+    if (!currentHtml || !updates || updates.length === 0) return false;
 
-    const encoded = encodeURIComponent(translatedHtml);
     let updatedHtml = currentHtml;
 
     if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
@@ -347,17 +348,47 @@ export class TranslationState {
         const parser = new DOMParser();
         const doc = parser.parseFromString(currentHtml, 'text/html');
         const imgs = Array.from(doc.querySelectorAll('img'));
-        let found = false;
-        for (const img of imgs) {
-          const srcAttr = img.getAttribute('src');
-          if (srcAttr === imageSrc || (imageSrc.length > 20 && srcAttr && imageSrc.includes(srcAttr))) {
-            img.setAttribute('data-translated-html', encoded);
-            found = true;
-            break;
+
+        imgs.forEach((img, idx) => {
+          if (!img.getAttribute('data-sila-img-id')) {
+            img.setAttribute('data-sila-img-id', `sila_img_${idx}`);
+          }
+        });
+
+        let modified = false;
+
+        for (const item of updates) {
+          if (!item.translatedHtml) continue;
+          const encoded = encodeURIComponent(item.translatedHtml);
+
+          let targetImg: HTMLImageElement | undefined;
+
+          if (item.imgId) {
+            targetImg = imgs.find(img => img.getAttribute('data-sila-img-id') === item.imgId);
+          }
+
+          if (!targetImg && typeof item.imgIndex === 'number' && item.imgIndex >= 0 && item.imgIndex < imgs.length) {
+            targetImg = imgs[item.imgIndex];
+          }
+
+          if (!targetImg && item.src) {
+            targetImg = imgs.find(img => {
+              const srcAttr = img.getAttribute('src');
+              return srcAttr === item.src || (item.src!.length > 20 && !!srcAttr && item.src!.includes(srcAttr));
+            });
+          }
+
+          if (targetImg) {
+            if (targetImg.getAttribute('data-translated-html') !== encoded) {
+              targetImg.setAttribute('data-translated-html', encoded);
+              modified = true;
+            }
           }
         }
-        if (found) {
-          updatedHtml = doc.documentElement.outerHTML;
+
+        if (modified) {
+          const hasDoctype = /^\s*<!doctype\s+html/i.test(currentHtml);
+          updatedHtml = (hasDoctype ? '<!DOCTYPE html>\n' : '') + doc.documentElement.outerHTML;
         }
       } catch (e) {
         console.warn('Lỗi khi parse HTML để cập nhật data-translated-html:', e);
@@ -371,7 +402,19 @@ export class TranslationState {
         await this.storageService.updateTranslationContent(activeId, updatedHtml);
         await this.fetchHistory();
       }
+      return true;
     }
+
+    return false;
+  }
+
+  async updateImageTranslationInContent(
+    imageSrc: string,
+    translatedHtml: string,
+    imgId?: string | null,
+    imgIndex?: number
+  ): Promise<boolean> {
+    return this.syncImageTranslations([{ src: imageSrc, translatedHtml, imgId, imgIndex }]);
   }
 
   cancelTimer() {

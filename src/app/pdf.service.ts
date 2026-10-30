@@ -1,8 +1,5 @@
 import { Injectable } from '@angular/core';
 import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 export interface PdfCropResult {
   fileBase64: string;
@@ -25,6 +22,10 @@ export class PdfService {
   }
 
   async extractImagesFromPDF(file: File, pdfHash: string): Promise<{ id: string, dataUrl: string }[]> {
+    const pdfjsLib = await import('pdfjs-dist');
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    }
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer.slice(0));
     const pdf = await pdfjsLib.getDocument({ data }).promise;

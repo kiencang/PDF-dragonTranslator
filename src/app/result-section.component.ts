@@ -22,7 +22,7 @@ import { TranslationState } from './translation.state';
         @if (resultHtml) {
           <div class="flex items-center">
             <div class="relative group">
-              <button (click)="downloadHtml.emit()" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+              <button (click)="onDownloadClick()" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                 <lucide-icon [img]="DownloadIcon" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
                 Download
               </button>
@@ -174,22 +174,83 @@ export class ResultSectionComponent {
     return this.htmlSignal();
   }
 
+  private async persistUpdatesWithoutReload(
+    updates: Array<{ imgId?: string | null; imgIndex?: number; src?: string | null; translatedHtml: string }>
+  ) {
+    if (!updates || updates.length === 0) return;
+    this.skipNextIframeReload = true;
+    const changed = await this.translationState.syncImageTranslations(updates);
+    if (!changed) {
+      this.skipNextIframeReload = false;
+    }
+  }
+
+  async onDownloadClick() {
+    try {
+      const iframeDoc = this.previewIframe()?.nativeElement?.contentDocument;
+      if (iframeDoc) {
+        const imgs = Array.from(iframeDoc.querySelectorAll('img'));
+        const updates: Array<{ imgId?: string | null; imgIndex?: number; src?: string | null; translatedHtml: string }> = [];
+
+        imgs.forEach((img, index) => {
+          let rawHtml: string | null = null;
+          const encodedAttr = img.getAttribute('data-translated-html');
+          if (encodedAttr) {
+            try {
+              rawHtml = decodeURIComponent(encodedAttr);
+            } catch {
+              rawHtml = null;
+            }
+          }
+
+          if (!rawHtml && img.parentElement?.classList.contains('interactive-img-wrapper')) {
+            const wrapper = img.parentElement as HTMLElement;
+            if (wrapper.dataset['translatedHtmlRaw']) {
+              rawHtml = wrapper.dataset['translatedHtmlRaw'];
+            } else {
+              const rec = wrapper.querySelector('.reconstructed-wrapper');
+              if (rec?.shadowRoot?.innerHTML) {
+                rawHtml = rec.shadowRoot.innerHTML;
+              }
+            }
+          }
+
+          if (rawHtml) {
+            updates.push({
+              imgId: img.getAttribute('data-sila-img-id') || `sila_img_${index}`,
+              imgIndex: index,
+              src: img.getAttribute('src'),
+              translatedHtml: rawHtml
+            });
+          }
+        });
+
+        if (updates.length > 0) {
+          await this.persistUpdatesWithoutReload(updates);
+        }
+      }
+    } catch (err) {
+      console.warn('Không thể đồng bộ trực tiếp từ iframe trước khi tải về:', err);
+    }
+
+    this.downloadHtml.emit();
+  }
+
   @HostListener('window:message', ['$event'])
   async onMessage(event: MessageEvent) {
     if (!event.data) return;
 
     if (event.data.type === 'PERSIST_TRANSLATED_IMAGE') {
-      const { src, translatedHtml } = event.data;
-      if (src && translatedHtml) {
-        this.skipNextIframeReload = true;
-        this.translationState.updateImageTranslationInContent(src, translatedHtml);
+      const { src, imgId, imgIndex, translatedHtml } = event.data;
+      if (translatedHtml) {
+        await this.persistUpdatesWithoutReload([{ src, imgId, imgIndex, translatedHtml }]);
       }
       return;
     }
 
     // Check if the message is from our iframe
     if (event.data.type === 'TRANSLATE_IMAGE') {
-      const { src, reqId } = event.data;
+      const { src, reqId, imgId, imgIndex } = event.data;
       if (!src) return;
       
       try {
@@ -199,6 +260,7 @@ export class ResultSectionComponent {
          } else {
             // Success
             const cleanHtml = this.imageProcessorService.extractHtml(translatedText);
+            await this.persistUpdatesWithoutReload([{ src, imgId, imgIndex, translatedHtml: cleanHtml }]);
             this.sendToIframe({ type: 'IMAGE_TRANSLATED', reqId, success: true, html: cleanHtml });
          }
       } catch (error: unknown) {

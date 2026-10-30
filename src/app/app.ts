@@ -13,6 +13,7 @@ import { HistoryModalComponent } from './history-modal.component';
 import { AppsModalComponent } from './apps-modal.component';
 import { ToastService } from './toast.service';
 import { TranslationState } from './translation.state';
+import { ImageProcessorService } from './image-processor.service';
 import { TranslatedDoc } from './storage.service';
 import { TranslationMode, SearchModel, ThinkingLevelOption } from './translation.state';
 export type { TranslationMode } from './translation.state';
@@ -29,6 +30,7 @@ export class App {
   private destroyRef = inject(DestroyRef);
   private toastService = inject(ToastService);
   private translationState = inject(TranslationState);
+  private imageProcessorService = inject(ImageProcessorService);
 
   // Icons
   readonly Clock = Clock;
@@ -245,7 +247,8 @@ export class App {
   downloadHtml() {
     const htmlText = this.resultHtml();
     if (htmlText) {
-      const blob = new Blob([htmlText], { type: 'text/html' });
+      const exportHtml = this.imageProcessorService.attachInteractiveScript(htmlText, true);
+      const blob = new Blob([exportHtml], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

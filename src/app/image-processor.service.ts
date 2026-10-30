@@ -15,27 +15,43 @@ export class ImageProcessorService {
   }
 
   postProcessHtml(html: string, extractedImages: ExtractedImage[]): string {
-    if (!extractedImages || extractedImages.length === 0) return html;
-    
-    let processedHtml = html;
-    for (const img of extractedImages) {
-      const escapedId = img.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      
-      const srcRegex = new RegExp(`src=["']\\[?${escapedId}\\]?["']`, 'g');
-      processedHtml = processedHtml.replace(srcRegex, `src="${img.dataUrl}"`);
-      
-      const fallbackRegex = new RegExp(`\\[IMAGE:\\s*${escapedId}\\]`, 'g');
-      processedHtml = processedHtml.replace(fallbackRegex, `<img src="${img.dataUrl}" style="max-width: 100%; height: auto;">`);
+    let processedHtml = html || '';
+    if (extractedImages && extractedImages.length > 0) {
+      for (const img of extractedImages) {
+        const escapedId = img.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        const srcRegex = new RegExp(`src=["']\\[?${escapedId}\\]?["']`, 'g');
+        processedHtml = processedHtml.replace(srcRegex, `src="${img.dataUrl}"`);
+        
+        const fallbackRegex = new RegExp(`\\[IMAGE:\\s*${escapedId}\\]`, 'g');
+        processedHtml = processedHtml.replace(fallbackRegex, `<img src="${img.dataUrl}" style="max-width: 100%; height: auto;">`);
+      }
     }
+
+    let imgCounter = 0;
+    processedHtml = processedHtml.replace(/<img\b([^>]*)>/gi, (fullMatch, attrs) => {
+      const idx = imgCounter++;
+      if (/data-sila-img-id=/i.test(attrs)) {
+        return fullMatch;
+      }
+      return `<img data-sila-img-id="sila_img_${idx}"${attrs}>`;
+    });
 
     return processedHtml;
   }
 
-  attachInteractiveScript(html: string): string {
+  attachInteractiveScript(html: string, isStandalone = false): string {
     if (!html) return html;
 
+    if (html.includes('id="sila-interactive-img-script"')) {
+      return html.replace(
+        /const IS_STANDALONE_EXPORT = (true|false);/,
+        `const IS_STANDALONE_EXPORT = ${isStandalone ? 'true' : 'false'};`
+      );
+    }
+
     const interactiveScript = `
-<style>
+<style id="sila-interactive-img-style">
   .interactive-img-wrapper { position: relative; display: inline-block; max-width: 100%; }
   .interactive-img-wrapper.show-reconstructed { display: block; width: 100%; }
   .interactive-img-wrapper img.original-img { display: block; max-width: 100%; height: auto; }
@@ -73,7 +89,9 @@ export class ImageProcessorService {
     to { opacity: 0; transform: translateY(-8px) scale(0.96); }
   }
 </style>
-<script>
+<script id="sila-interactive-img-script">
+  const IS_STANDALONE_EXPORT = ${isStandalone ? 'true' : 'false'};
+
   function showImgToast(message, isSuccess) {
     let container = document.getElementById('img-trans-toast-container');
     if (!container) {
@@ -93,16 +111,24 @@ export class ImageProcessorService {
   }
 
   function initImages() {
-    document.querySelectorAll('img').forEach(img => {
+    document.querySelectorAll('img').forEach((img, index) => {
       if (img.dataset.processInit) return;
       img.dataset.processInit = "true";
 
-      const process = () => {
-        if (img.naturalWidth < 200 && img.naturalHeight < 200) return;
-        if (img.parentElement.classList.contains('interactive-img-wrapper')) return;
+      const imgId = img.getAttribute('data-sila-img-id') || ('sila_img_' + index);
+      img.setAttribute('data-sila-img-id', imgId);
+      img.dataset.silaImgIndex = String(index);
+
+      const setupWrapper = () => {
+        const cachedHtmlAttr = img.getAttribute('data-translated-html');
+        if (IS_STANDALONE_EXPORT && !cachedHtmlAttr) return;
+        if (!cachedHtmlAttr && img.naturalWidth < 200 && img.naturalHeight < 200) return;
+        if (img.parentElement && img.parentElement.classList.contains('interactive-img-wrapper')) return;
 
         const wrapper = document.createElement('div');
         wrapper.className = 'interactive-img-wrapper';
+        wrapper.dataset.silaImgId = imgId;
+        wrapper.dataset.silaImgIndex = String(index);
         img.parentNode.insertBefore(wrapper, img);
         
         img.classList.add('original-img');
@@ -111,11 +137,11 @@ export class ImageProcessorService {
         const btn = document.createElement('button');
         btn.className = 'translate-btn';
         
-        const cachedHtmlAttr = img.getAttribute('data-translated-html');
         if (cachedHtmlAttr) {
           try {
             const decodedHtml = decodeURIComponent(cachedHtmlAttr);
             wrapper.dataset.translatedContent = "true";
+            wrapper.dataset.translatedHtmlRaw = decodedHtml;
             const rec = document.createElement('div');
             rec.className = 'reconstructed-wrapper';
             const shadow = rec.attachShadow({ mode: 'open' });
@@ -125,6 +151,7 @@ export class ImageProcessorService {
             btn.textContent = 'Hiển thị ảnh gốc';
           } catch (err) {
             console.error('Lỗi decode cached image html:', err);
+            if (IS_STANDALONE_EXPORT) return;
             btn.textContent = 'Dịch sơ đồ/biểu đồ này';
           }
         } else {
@@ -138,27 +165,35 @@ export class ImageProcessorService {
            e.stopPropagation();
            if (wrapper.classList.contains('show-reconstructed')) {
               wrapper.classList.remove('show-reconstructed');
-              btn.textContent = 'Dịch sơ đồ/biểu đồ này';
+              btn.textContent = wrapper.dataset.translatedContent ? 'Hiển thị bản dịch' : 'Dịch sơ đồ/biểu đồ này';
            } else {
               if (wrapper.dataset.translatedContent) {
                   wrapper.classList.add('show-reconstructed');
                   btn.textContent = 'Hiển thị ảnh gốc';
-              } else {
+              } else if (!IS_STANDALONE_EXPORT) {
                   const id = Math.random().toString(36).substring(7);
                   wrapper.dataset.reqId = id;
                   btn.textContent = 'Đang dịch...';
                   btn.disabled = true;
                   btn.style.opacity = '1';
-                  window.parent.postMessage({ type: 'TRANSLATE_IMAGE', src: img.src, reqId: id }, '*');
+                  window.parent.postMessage({
+                    type: 'TRANSLATE_IMAGE',
+                    src: img.getAttribute('src') || img.src,
+                    reqId: id,
+                    imgId: imgId,
+                    imgIndex: index
+                  }, '*');
               }
            }
         });
       };
 
-      if (img.complete) {
-        process();
+      if (img.getAttribute('data-translated-html')) {
+        setupWrapper();
+      } else if (img.complete && img.naturalWidth > 0) {
+        setupWrapper();
       } else {
-        img.addEventListener('load', process);
+        img.addEventListener('load', setupWrapper);
       }
     });
   }
@@ -178,15 +213,19 @@ export class ImageProcessorService {
               btn.style.opacity = ''; 
               if (event.data.success) {
                   wrapper.dataset.translatedContent = "true";
+                  wrapper.dataset.translatedHtmlRaw = event.data.html;
                   const imgEl = wrapper.querySelector('img.original-img');
                   if (imgEl) {
                       imgEl.setAttribute('data-translated-html', encodeURIComponent(event.data.html));
                   }
-                  const rec = document.createElement('div');
-                  rec.className = 'reconstructed-wrapper';
-                  const shadow = rec.attachShadow({ mode: 'open' });
+                  let rec = wrapper.querySelector('.reconstructed-wrapper');
+                  if (!rec) {
+                      rec = document.createElement('div');
+                      rec.className = 'reconstructed-wrapper';
+                      wrapper.appendChild(rec);
+                  }
+                  const shadow = rec.shadowRoot || rec.attachShadow({ mode: 'open' });
                   shadow.innerHTML = event.data.html;
-                  wrapper.appendChild(rec);
                   wrapper.classList.add('show-reconstructed');
                   btn.textContent = 'Hiển thị ảnh gốc';
 
@@ -195,6 +234,8 @@ export class ImageProcessorService {
                   window.parent.postMessage({
                       type: 'PERSIST_TRANSLATED_IMAGE',
                       src: imgEl ? imgEl.getAttribute('src') : null,
+                      imgId: imgEl ? imgEl.getAttribute('data-sila-img-id') : wrapper.dataset.silaImgId,
+                      imgIndex: wrapper.dataset.silaImgIndex ? Number(wrapper.dataset.silaImgIndex) : undefined,
                       translatedHtml: event.data.html
                   }, '*');
               } else {
