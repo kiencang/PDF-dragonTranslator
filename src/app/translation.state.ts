@@ -33,7 +33,7 @@ export class TranslationState {
   fileBase64 = signal<string | null>(null);
   mimeType = signal<string>('');
   
-  userApiKey = signal<string>('');
+  hasUserApiKey = signal<boolean>(false);
   thinkingLevel = signal<ThinkingLevelOption>('medium');
   mode = signal<TranslationMode>('zero_svg');
   useGoogleSearch = signal<boolean>(false);

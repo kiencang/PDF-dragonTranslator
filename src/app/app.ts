@@ -16,6 +16,7 @@ import { TranslationState } from './translation.state';
 import { ImageProcessorService } from './image-processor.service';
 import { TranslatedDoc } from './storage.service';
 import { TranslationMode, SearchModel, ThinkingLevelOption } from './translation.state';
+import { getSecureApiKey, hasSecureApiKey, removeSecureApiKey, saveSecureApiKey } from './crypto-storage.util';
 export type { TranslationMode } from './translation.state';
 
 @Component({
@@ -70,7 +71,7 @@ export class App {
   isBusy = this.translationState.isBusy;
   progressMessage = this.translationState.progressMessage;
   formattedTime = this.translationState.formattedTime;
-  userApiKey = this.translationState.userApiKey;
+  hasUserApiKey = this.translationState.hasUserApiKey;
   historyItems = this.translationState.historyItems;
   activeHistoryItemId = this.translationState.activeHistoryItemId;
   canProcess = this.translationState.canProcess;
@@ -102,11 +103,8 @@ export class App {
         this.translationState.searchModel.set(savedSearchModel);
       }
 
-      // Load saved user API Key
-      const savedKey = localStorage.getItem('sila_pdf_translator_user_api_key');
-      if (savedKey) {
-        this.translationState.userApiKey.set(savedKey);
-      }
+      // Kiểm tra và tự động chuyển đổi (migrate) khóa API sang chuẩn mã hóa AES-GCM 256-bit
+      void this.initSecureApiKeyState();
 
       // Load saved Thinking Level
       const savedThinking = localStorage.getItem('sila_pdf_translator_thinking_level');
@@ -114,6 +112,11 @@ export class App {
         this.translationState.thinkingLevel.set(savedThinking);
       }
     }
+  }
+
+  private async initSecureApiKeyState(): Promise<void> {
+    const exists = await hasSecureApiKey();
+    this.translationState.hasUserApiKey.set(exists);
   }
 
   showToast(type: 'error' | 'info' | 'success', message: string) {
@@ -156,11 +159,12 @@ export class App {
     this.showToast('success', 'Đã lưu cấu hình mặc định!');
   }
 
-  openApiKeyModal() {
+  async openApiKeyModal() {
     if (this.isBusy()) return;
     if (typeof localStorage !== 'undefined') {
-      const savedKey = localStorage.getItem('sila_pdf_translator_user_api_key') || '';
+      const savedKey = await getSecureApiKey();
       this.tempApiKey.set(savedKey);
+      this.translationState.hasUserApiKey.set(savedKey.length > 0);
       const savedThinking = localStorage.getItem('sila_pdf_translator_thinking_level');
       this.tempThinkingLevel.set((savedThinking === 'medium' || savedThinking === 'high') ? savedThinking : this.translationState.thinkingLevel());
     } else {
@@ -171,10 +175,11 @@ export class App {
   }
 
   closeApiKeyModal() {
+    this.tempApiKey.set('');
     this.showApiKeyModal.set(false);
   }
 
-  saveApiKey(config?: { apiKey: string; thinkingLevel: ThinkingLevelOption }) {
+  async saveApiKey(config?: { apiKey: string; thinkingLevel: ThinkingLevelOption }) {
     if (config) {
       this.tempApiKey.set(config.apiKey);
       this.tempThinkingLevel.set(config.thinkingLevel);
@@ -182,27 +187,26 @@ export class App {
     const keyVal = this.tempApiKey().trim();
     const thinkingVal = this.tempThinkingLevel();
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('sila_pdf_translator_user_api_key', keyVal);
+      await saveSecureApiKey(keyVal);
       localStorage.setItem('sila_pdf_translator_thinking_level', thinkingVal);
     }
-    this.translationState.userApiKey.set(keyVal);
+    this.translationState.hasUserApiKey.set(keyVal.length > 0);
     this.translationState.thinkingLevel.set(thinkingVal);
+    this.tempApiKey.set('');
     this.showApiKeyModal.set(false);
     if (keyVal) {
-      this.showToast('success', 'Đã lưu cấu hình API Key và Thinking level!');
+      this.showToast('success', 'Đã mã hóa và lưu cấu hình API Key & Thinking level!');
     } else {
       this.showToast('info', 'Đã lưu Thinking level (bạn chưa nhập API Key).');
     }
   }
 
-  clearApiKey() {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('sila_pdf_translator_user_api_key');
-    }
-    this.translationState.userApiKey.set('');
+  async clearApiKey() {
+    await removeSecureApiKey();
+    this.translationState.hasUserApiKey.set(false);
     this.tempApiKey.set('');
     this.showApiKeyModal.set(false);
-    this.showToast('info', 'Đã xóa cấu hình API Key. Hãy cấu hình lại để tiếp tục sử dụng.');
+    this.showToast('info', 'Đã xóa sạch khóa bảo mật API Key. Hãy cấu hình lại để tiếp tục sử dụng.');
   }
 
   onFileSelected(file: File) {

@@ -74,7 +74,7 @@ import { ThinkingLevelOption } from './translation.state';
               </button>
             </div>
             <p class="text-[11px] text-slate-500 mt-2.5 italic leading-relaxed">
-              Khóa API của bạn được lưu <strong class="text-slate-700 font-semibold">cục bộ tuyệt đối</strong> trong trình duyệt của bạn (<code class="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded text-indigo-600">LocalStorage</code>), không lưu trữ trên bất kỳ máy chủ nào khác.
+              Khóa API của bạn được <strong class="text-slate-700 font-semibold">mã hóa phần cứng/trình duyệt bằng chuẩn AES-GCM 256-bit</strong> (<code class="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded text-indigo-600">Web Crypto API</code> + <code class="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded text-indigo-600">IndexedDB</code> với khóa không thể trích xuất <code class="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded text-emerald-700">extractable: false</code>), không lưu dạng văn bản thô trong <code class="font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded text-slate-600">LocalStorage</code>.
             </p>
           </div>
 

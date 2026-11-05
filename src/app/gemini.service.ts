@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { PromptService } from './prompt.service';
+import { getSecureApiKey } from './crypto-storage.util';
 
 export interface TranslationResult {
   text: string;
@@ -22,12 +23,10 @@ export class GeminiService {
   private readonly MODEL_NAME_ARGON = 'gemini-4-argon';
   private readonly MAX_OUTPUT_TOKENS = 256000;
 
-  private getUserApiKey(): string {
-    if (typeof localStorage !== 'undefined') {
-      const userKey = localStorage.getItem('sila_pdf_translator_user_api_key');
-      if (userKey && userKey.trim() !== '') {
-        return userKey.trim();
-      }
+  private async getUserApiKey(): Promise<string> {
+    const userKey = await getSecureApiKey();
+    if (userKey && userKey.trim() !== '') {
+      return userKey.trim();
     }
     throw new Error('Vui lòng thiết lập "API Key cá nhân" trong phần "Nhập API Key" (nằm ngay dưới logo) để sử dụng ứng dụng.');
   }
@@ -225,7 +224,7 @@ export class GeminiService {
     background?: boolean;
     userApiKey: string;
   }): Promise<InteractionApiResponse> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${payload.userApiKey}`;
+    const url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
     const generationConfig: Record<string, any> = {
       max_output_tokens: payload.maxOutputTokens ?? this.MAX_OUTPUT_TOKENS,
     };
@@ -258,7 +257,10 @@ export class GeminiService {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': payload.userApiKey,
+      },
       body: JSON.stringify(body),
     });
 
@@ -281,11 +283,14 @@ export class GeminiService {
 
   private async directGetInteraction(interactionId: string, userApiKey: string): Promise<InteractionApiResponse> {
     const cleanId = interactionId.replace(/^interactions\//, '');
-    const url = `https://generativelanguage.googleapis.com/v1beta/interactions/${cleanId}?key=${userApiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/interactions/${cleanId}`;
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': userApiKey,
+      },
     });
 
     const rawText = await response.text();
@@ -398,7 +403,7 @@ export class GeminiService {
   }
 
   private async directCountTokens(fileData: string, mimeType: string, userApiKey: string): Promise<number> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:countTokens?key=${userApiKey}`;
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:countTokens';
     const cleanFileData = fileData.includes(',') ? fileData.split(',')[1] : fileData;
     const contentParts = [
       {
@@ -412,7 +417,8 @@ export class GeminiService {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-goog-api-key': userApiKey,
       },
       body: JSON.stringify({
         contents: [
@@ -441,7 +447,7 @@ export class GeminiService {
   }
 
   async countTokens(fileData: string, mimeType: string): Promise<number> {
-    const userApiKey = this.getUserApiKey();
+    const userApiKey = await this.getUserApiKey();
 
     if (this.serverProxyAvailable !== false) {
       const serverResult = await this.safeFetchServer('/api/gemini/count-tokens', {
@@ -467,7 +473,7 @@ export class GeminiService {
     images: {id: string, dataUrl: string}[] = [],
     thinkingLevel: 'medium' | 'high' = 'medium'
   ): Promise<TranslationResult> {
-    const userApiKey = this.getUserApiKey();
+    const userApiKey = await this.getUserApiKey();
     const interactionInput: any[] = [];
     
     // Add the main PDF document
@@ -525,7 +531,7 @@ export class GeminiService {
     modelName: string = this.MODEL_NAME_ARGON,
     thinkingLevel: 'medium' | 'high' = 'medium'
   ): Promise<string> {
-    const userApiKey = this.getUserApiKey();
+    const userApiKey = await this.getUserApiKey();
     const [systemInstruction, promptText] = await Promise.all([
       this.promptService.loadPrompt('image_translation_system_instructions.md'),
       this.promptService.loadPrompt('image_translation_prompt.md')
@@ -566,7 +572,7 @@ export class GeminiService {
   }
 
   async translateSearchQuery(query: string, searchModel: 'gemini-flash-lite-latest' | 'gemini-flash-latest' = 'gemini-flash-lite-latest'): Promise<string> {
-    const userApiKey = this.getUserApiKey();
+    const userApiKey = await this.getUserApiKey();
     const systemInstruction = `Bạn là một AI chuyên dịch truy vấn tìm kiếm (search queries) từ tiếng Việt sang Tiếng Anh. Nhiệm vụ DUY NHẤT của bạn là trả về MỘT (1) truy vấn tìm kiếm tiếng Anh hiệu quả nhất, dựa trên đánh giá của bạn về ý định (search intent) và cách tìm kiếm phổ biến nhất trong tiếng Anh.
 
 QUY TẮC BẮT BUỘC TUÂN THỦ:
